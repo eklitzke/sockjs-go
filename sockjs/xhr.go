@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -68,21 +69,29 @@ func (h *handler) xhrPoll(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (h *handler) xhrStreaming(rw http.ResponseWriter, req *http.Request) {
+	log.Println("begin xhrstreaming")
+	defer log.Println("end xhrstreaming")
 	rw.Header().Set("content-type", "application/javascript; charset=UTF-8")
 	fmt.Fprintf(rw, "%s\n", xhrStreamingPrelude)
+	log.Println("before flush")
 	rw.(http.Flusher).Flush()
+	log.Println("after flush")
 
 	sess, _ := h.sessionByRequest(req)
 	receiver := newHTTPReceiver(rw, h.options.ResponseLimit, new(xhrFrameWriter))
 
+	log.Println("before attach")
 	if err := sess.attachReceiver(receiver); err != nil {
 		receiver.sendFrame(cFrame)
 		receiver.close()
 		return
 	}
+	log.Println("after attach")
 
+	log.Println("before select")
 	select {
 	case <-receiver.doneNotify():
 	case <-receiver.interruptedNotify():
 	}
+	log.Println("after select")
 }
