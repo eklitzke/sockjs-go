@@ -2,11 +2,13 @@ package sockjs
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 var (
@@ -69,7 +71,15 @@ func newHandler(prefix string, opts Options, handlerFunc func(Session)) *handler
 
 func (h *handler) Prefix() string { return h.prefix }
 
+var handlerInFlight int32
+
 func (h *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	atomic.AddInt32(&handlerInFlight, 1)
+	log.Printf("begin sockjs inflight %d %s\n", int(handlerInFlight), req.RequestURI)
+	defer func() {
+		atomic.AddInt32(&handlerInFlight, -1)
+		log.Printf("end sockjs inflight %d %s\n", int(handlerInFlight), req.RequestURI)
+	}()
 	// iterate over mappings
 	allowedMethods := []string{}
 	for _, mapping := range h.mappings {
